@@ -16,22 +16,24 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-// import { useAuth } from "../../../context/AuthContext";
+import { useAuth } from "../../../context/AuthContext";
 
 const { width } = Dimensions.get("window");
 
 export default function LibraryStaffLogin() {
+  const router = useRouter();
   const [staffId, setStaffId] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
-  const router = useRouter();
-  // const { login } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+  const { isAuthenticated, loginStaff } = useAuth();
 
-  // Default staff credentials
-  const defaultStaffId = "staff001";
-  const defaultPassword = "password123";
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.replace("/(app)/staff/");
+    }
+  }, [isAuthenticated]);
 
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
@@ -53,7 +55,7 @@ export default function LibraryStaffLogin() {
     };
   }, []);
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (!staffId || !password) {
       Alert.alert("Error", "Please enter both staff ID and password");
       return;
@@ -61,14 +63,19 @@ export default function LibraryStaffLogin() {
 
     setIsLoading(true);
 
-    // Check if entered credentials match default ones
-    if (staffId === defaultStaffId && password === defaultPassword) {
-      router.replace("/(app)/staff/");
-    } else {
-      Alert.alert("Login Failed", "Invalid staff ID or password");
-    }
+    try {
+      const result = await loginStaff({ staffId, password });
+      console.log("Login result:", result);
 
-    setIsLoading(false);
+      if (!result.success) {
+        Alert.alert("Login Failed", result.error);
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      Alert.alert("Error", "Something went wrong. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const togglePasswordVisibility = () => {
@@ -134,6 +141,10 @@ export default function LibraryStaffLogin() {
                 onChangeText={setStaffId}
                 autoCapitalize="none"
                 placeholderTextColor="#999"
+                numberOfLines={1}
+                multiline={false}
+                scrollEnabled={false}
+                textAlignVertical="center"
               />
             </View>
 
@@ -148,6 +159,10 @@ export default function LibraryStaffLogin() {
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
                 placeholderTextColor="#999"
+                numberOfLines={1}
+                multiline={false}
+                scrollEnabled={false}
+                textAlignVertical="center"
               />
               <TouchableOpacity
                 onPress={togglePasswordVisibility}
@@ -174,19 +189,6 @@ export default function LibraryStaffLogin() {
               {isLoading ? "Logging in..." : "Login"}
             </Text>
           </TouchableOpacity>
-
-          {/* <TouchableOpacity
-            onPress={() => router.replace("/(app)/staff/")}
-            disabled={isLoading}
-            style={[
-              styles.loginButton,
-              isLoading && styles.loginButtonDisabled,
-            ]}
-          >
-            <Text style={styles.loginButtonText}>
-              {isLoading ? "Logging in..." : "Login"}
-            </Text>
-          </TouchableOpacity> */}
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>

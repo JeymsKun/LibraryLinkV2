@@ -1,14 +1,20 @@
 import React, { useEffect } from "react";
 import { useRouter } from "expo-router";
+import { supabase } from "../../../lib/supabase";
 
 export default function LogoutScreen() {
   const router = useRouter();
 
   useEffect(() => {
-    // Clear authentication tokens or user data here
-    // Example: AsyncStorage.removeItem('auth_token');
+    const logout = async () => {
+      await supabase.auth.signOut();
 
-    router.push("/(auth)/login"); // Redirect to login screen
+      setTimeout(() => {
+        router.replace("/(auth)/login");
+      }, 200);
+    };
+
+    logout();
   }, []);
 
   return null;

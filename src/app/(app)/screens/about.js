@@ -1,45 +1,101 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
   StyleSheet,
   Dimensions,
   TouchableOpacity,
+  Image,
+  ActivityIndicator,
 } from "react-native";
 import Carousel from "react-native-reanimated-carousel";
+import { useLocalSearchParams } from "expo-router";
+import { supabase } from "../../../lib/supabase";
+import { useBooking } from "../../../context/BookingContext";
 
 const { width, height } = Dimensions.get("window");
 
-export default function AboutBook() {
-  const [currentIndex, setCurrentIndex] = useState(0);
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const BUCKET_NAME = "library";
 
-  const books = Array.from({ length: 3 }, (_, i) => ({
-    id: i + 1,
-    title: `BOOK TITLE`,
-    description: `Description of Book.
-Including its availability.`,
-  }));
+const makePublicUrl = (path) =>
+  `${SUPABASE_URL}/storage/v1/object/public/${BUCKET_NAME}/${path}`;
+
+export default function AboutBook() {
+  const { id } = useLocalSearchParams();
+  const { addBooking } = useBooking();
+  const [book, setBook] = useState(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!id) return;
+
+    const fetchBook = async () => {
+      const { data, error } = await supabase
+        .from("books")
+        .select("*")
+        .eq("books_id", id)
+        .single();
+
+      if (error) {
+        console.error("Error fetching book:", error);
+      } else {
+        console.log("Fetched book:", data);
+        setBook(data);
+      }
+
+      setLoading(false);
+    };
+
+    fetchBook();
+  }, [id]);
+
+  const images = book
+    ? [
+        makePublicUrl(book.cover_image_url),
+        ...(book.image_urls || []).map(makePublicUrl),
+      ].filter(Boolean)
+    : [];
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#000" />
+        <Text style={{ marginTop: 10 }}>Loading book details...</Text>
+      </View>
+    );
+  }
+
+  if (!book) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text>Book not found.</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
       <Carousel
         width={width}
         height={height * 0.45}
-        data={books}
+        data={images}
         scrollAnimationDuration={500}
         onSnapToItem={(index) => setCurrentIndex(index)}
         renderItem={({ item }) => (
           <View style={styles.bookContainer}>
-            <View style={styles.cross}>
-              <View style={styles.crossLine1} />
-              <View style={styles.crossLine2} />
-            </View>
+            <Image
+              source={{ uri: item }}
+              style={{ width: "100%", height: "100%", borderRadius: 12 }}
+              resizeMode="cover"
+            />
           </View>
         )}
       />
 
       <View style={styles.pagination}>
-        {books.map((_, index) => (
+        {images.map((_, index) => (
           <View
             key={index}
             style={[styles.dot, currentIndex === index && styles.activeDot]}
@@ -47,13 +103,13 @@ Including its availability.`,
         ))}
       </View>
 
-      <Text style={styles.bookTitle}>{books[currentIndex].title}</Text>
-      <Text style={styles.bookDescription}>
-        {books[currentIndex].description}
-      </Text>
+      <Text style={styles.bookTitle}>{book.title}</Text>
+      <Text style={styles.bookDescription}>{book.description}</Text>
 
-      {/* Add to Booking Card Button */}
-      <TouchableOpacity style={styles.bookingButton}>
+      <TouchableOpacity
+        style={styles.bookingButton}
+        onPress={() => addBooking(book)}
+      >
         <Text style={styles.bookingButtonText}>Add to Booking Cart</Text>
       </TouchableOpacity>
     </View>
@@ -67,10 +123,16 @@ const styles = StyleSheet.create({
     paddingTop: height * 0.05,
     alignItems: "center",
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#A9DEFF",
+  },
   bookContainer: {
     backgroundColor: "#fff",
     borderRadius: 12,
-    width: width * 0.6,
+    width: width * 0.7,
     height: height * 0.4,
     justifyContent: "center",
     alignItems: "center",
@@ -80,32 +142,13 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
     alignSelf: "center",
-  },
-  cross: {
-    position: "relative",
-    width: "160%",
-    height: "80%",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  crossLine1: {
-    position: "absolute",
-    width: "100%",
-    height: 1,
-    backgroundColor: "gray",
-    transform: [{ rotate: "55deg" }],
-  },
-  crossLine2: {
-    position: "absolute",
-    width: "100%",
-    height: 1,
-    backgroundColor: "gray",
-    transform: [{ rotate: "-55deg" }],
+    overflow: "hidden",
   },
   pagination: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
+    marginTop: 10,
   },
   dot: {
     width: 8,
@@ -129,6 +172,7 @@ const styles = StyleSheet.create({
     color: "#333",
     margin: height * 0.01,
     paddingHorizontal: width * 0.1,
+    textAlign: "center",
   },
   bookingButton: {
     position: "absolute",

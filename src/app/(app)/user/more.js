@@ -8,6 +8,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { supabase } from "../../../lib/supabase";
 
 const { width, height } = Dimensions.get("window");
 
@@ -33,7 +34,14 @@ export default function MoreSettings() {
 
       <TouchableOpacity
         style={styles.option}
-        onPress={() => router.push("/(auth)/login/")}
+        onPress={async () => {
+          const { error } = await supabase.auth.signOut();
+          if (error) {
+            console.error("Error logging out:", error.message);
+            return;
+          }
+          router.replace("/(auth)/login/");
+        }}
       >
         <Ionicons name="log-out" size={height * 0.03} color="#000" />
         <Text style={styles.optionText}>Logout</Text>

@@ -16,18 +16,24 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-// import { useAuth } from "../../../context/AuthContext";
+import { useAuth } from "../../../context/AuthContext";
 
 const { width } = Dimensions.get("window");
 
 export default function LibraryUserLogin() {
-  const [username, setUsername] = useState("");
+  const { isAuthenticated, loginUser } = useAuth();
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const router = useRouter();
-  // const { login } = useAuth();
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.replace("/(app)/user/");
+    }
+  }, [isAuthenticated]);
 
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
@@ -50,22 +56,25 @@ export default function LibraryUserLogin() {
   }, []);
 
   const handleLogin = async () => {
-    if (!username || !password) {
-      Alert.alert("Error", "Please enter both username and password");
+    if (!email || !password) {
+      Alert.alert("Error", "Please enter both email and password");
       return;
     }
 
     setIsLoading(true);
 
     try {
-      const result = await login({ email: username, password }, "user");
+      const result = await loginUser({ email, password });
 
       if (!result.success) {
         Alert.alert(
           "Login Failed",
           result.error || "Please check your credentials and try again"
         );
+        return;
       }
+
+      router.push("/(app)/user/");
     } catch (error) {
       Alert.alert("Error", "An unexpected error occurred. Please try again.");
     } finally {
@@ -126,15 +135,20 @@ export default function LibraryUserLogin() {
           <View style={styles.inputWrapper}>
             <View style={styles.inputContainer}>
               <View style={styles.iconContainer}>
-                <Ionicons name="person-outline" size={20} color="#777" />
+                <Ionicons name="mail-outline" size={20} color="#777" />
               </View>
               <TextInput
                 style={styles.input}
-                placeholder="Username"
-                value={username}
-                onChangeText={setUsername}
+                placeholder="Email"
+                value={email}
+                onChangeText={setEmail}
                 autoCapitalize="none"
+                keyboardType="email-address"
                 placeholderTextColor="#999"
+                numberOfLines={1}
+                multiline={false}
+                scrollEnabled={false}
+                textAlignVertical="center"
               />
             </View>
 
@@ -149,6 +163,10 @@ export default function LibraryUserLogin() {
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
                 placeholderTextColor="#999"
+                numberOfLines={1}
+                multiline={false}
+                scrollEnabled={false}
+                textAlignVertical="center"
               />
               <TouchableOpacity
                 onPress={togglePasswordVisibility}
@@ -163,21 +181,8 @@ export default function LibraryUserLogin() {
             </View>
           </View>
 
-          {/* <TouchableOpacity
-            onPress={handleLogin}
-            disabled={isLoading}
-            style={[
-              styles.loginButton,
-              isLoading && styles.loginButtonDisabled,
-            ]}
-          >
-            <Text style={styles.loginButtonText}>
-              {isLoading ? "Logging in..." : "Login"}
-            </Text>
-          </TouchableOpacity> */}
-
           <TouchableOpacity
-            onPress={() => router.push("/(app)/user/")}
+            onPress={handleLogin}
             disabled={isLoading}
             style={[
               styles.loginButton,

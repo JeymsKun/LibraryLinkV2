@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import {
   SafeAreaView,
   StyleSheet,
@@ -11,13 +11,20 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Image,
 } from "react-native";
 import { CameraView } from "expo-camera";
+import { supabase } from "../../../lib/supabase";
 
 const { width, height } = Dimensions.get("window");
 
-export default function qrScan() {
+export default function BarcodeScan() {
+  const [bookInfo, setBookInfo] = useState(null);
+  const [showBookInfo, setShowBookInfo] = useState(false);
+  const [manualBarcode, setManualBarcode] = useState("");
   const scanLineAnimation = useRef(new Animated.Value(0)).current;
+  const manualInputRef = useRef(null);
+  const [scanning, setScanning] = useState(true);
 
   useEffect(() => {
     Animated.loop(
@@ -41,10 +48,58 @@ export default function qrScan() {
     outputRange: [0, height * 0.4],
   });
 
+  const fetchBookInfo = async (barcodeData) => {
+    try {
+      const { data, error } = await supabase
+        .from("books")
+        .select("*")
+        .eq("barcode_code", barcodeData)
+        .single();
+
+      if (error) {
+        console.error("Error fetching book data:", error);
+        return;
+      }
+
+      const coverUrl = supabase.storage
+        .from("library")
+        .getPublicUrl(data.cover_image_url.trim()).data.publicUrl;
+
+      const imageUrls = Array.isArray(data.image_urls)
+        ? data.image_urls.map(
+            (imgPath) =>
+              supabase.storage.from("library").getPublicUrl(imgPath.trim()).data
+                .publicUrl
+          )
+        : [];
+
+      console.log("✔️ Cover URL:", coverUrl);
+      console.log("🖼️ Image URLs:", imageUrls);
+
+      setBookInfo({
+        ...data,
+        coverUrl,
+        imageUrls,
+      });
+    } catch (err) {
+      console.error("Error while fetching book info:", err);
+    }
+  };
+
+  const handleManualInput = () => {
+    console.log("Manual Barcode Input: ", manualBarcode);
+    if (manualBarcode.trim()) {
+      fetchBookInfo(manualBarcode.trim());
+    } else {
+      console.log("No barcode entered");
+    }
+  };
+
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
     >
       <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
         <SafeAreaView style={styles.container}>
@@ -56,13 +111,25 @@ export default function qrScan() {
             style={styles.camStyle}
             facing="back"
             barcodeScannerSettings={{
-              barcodeTypes: "qr",
+              barcodeTypes: [
+                "ean13",
+                "ean8",
+                "upc_a",
+                "upc_e",
+                "code128",
+                "code39",
+                "itf",
+                "codabar",
+              ],
             }}
             onBarcodeScanned={({ data }) => {
-              console.log(data);
+              if (scanning) {
+                setScanning(false);
+                console.log(data);
+                fetchBookInfo(data);
+              }
             }}
           >
-            {/* Overlay for corner markers */}
             <View style={styles.overlay}>
               <View style={[styles.corner, styles.topLeft]} />
               <View style={[styles.corner, styles.topRight]} />
@@ -70,18 +137,18 @@ export default function qrScan() {
               <View style={[styles.corner, styles.bottomRight]} />
             </View>
 
-            {/* Scanning line */}
             <Animated.View
               style={[styles.scanLine, { transform: [{ translateY }] }]}
             />
           </CameraView>
 
-          {/* Row with text and Line */}
           <View style={styles.manualInputRow}>
             <Text style={styles.manualInputText}>Enter barcode manually:</Text>
             <View style={{ flex: 1, position: "relative" }}>
               <TextInput
                 style={styles.input}
+                value={manualBarcode}
+                onChangeText={setManualBarcode}
                 placeholder=""
                 keyboardType="default"
               />
@@ -89,9 +156,73 @@ export default function qrScan() {
             </View>
           </View>
 
-          <TouchableOpacity style={styles.cancelButton}>
-            <Text style={styles.cancelButtonText}>CANCEL</Text>
+          <TouchableOpacity
+            style={[
+              styles.cancelButton,
+              { backgroundColor: manualBarcode ? "#F8B919" : "#B3B3B3" },
+            ]}
+            onPress={() => {
+              if (manualBarcode.trim()) {
+                handleManualInput();
+              } else {
+                setBookInfo(null);
+                setScanning(true);
+                setShowBookInfo(false);
+                if (manualInputRef.current) {
+                  manualInputRef.current.clear();
+                }
+              }
+            }}
+          >
+            <Text style={styles.cancelButtonText}>
+              {manualBarcode ? "Enter" : "CANCEL"}
+            </Text>
           </TouchableOpacity>
+
+          {bookInfo && (
+            <TouchableOpacity
+              style={styles.viewInfoButton}
+              onPress={() => setShowBookInfo(!showBookInfo)}
+            >
+              <Text style={styles.viewInfoButtonText}>
+                {showBookInfo ? "Hide Book Info" : "View Book Info"}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {showBookInfo && bookInfo ? (
+            <View style={styles.bookInfoContainer}>
+              {bookInfo.coverUrl && (
+                <View style={{ padding: 10, alignItems: "center" }}>
+                  <Image
+                    key={bookInfo.coverUrl}
+                    source={{ uri: bookInfo.coverUrl }}
+                    style={{
+                      width: 200,
+                      height: 300,
+                      resizeMode: "cover",
+                    }}
+                  />
+                </View>
+              )}
+              <View style={{ padding: 10 }}>
+                <Text style={styles.bookTitle}>{bookInfo.title}</Text>
+                <Text style={styles.bookAuthor}>By: {bookInfo.author}</Text>
+                <Text style={styles.bookDetails}>Genre: {bookInfo.genre}</Text>
+
+                {bookInfo.isbn && (
+                  <Text style={styles.bookDetails}>ISBN: {bookInfo.isbn}</Text>
+                )}
+
+                <Text style={styles.bookDetails}>
+                  Published: {new Date(bookInfo.published_date).toDateString()}
+                </Text>
+                <Text style={styles.bookDescription}>
+                  {bookInfo.description}
+                </Text>
+              </View>
+            </View>
+          ) : null}
         </SafeAreaView>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -118,6 +249,34 @@ const styles = StyleSheet.create({
     marginBottom: height * 0.01,
     color: "#000",
     textAlign: "center",
+  },
+  bookInfoContainer: {
+    backgroundColor: "#ffffff",
+    borderRadius: 10,
+    padding: 10,
+    margin: height * 0.05,
+  },
+  bookTitle: {
+    fontSize: width * 0.05,
+    marginVertical: height * 0.03,
+    textAlign: "center",
+    fontWeight: "bold",
+    color: "#000",
+  },
+  bookAuthor: {
+    fontSize: width * 0.04,
+    fontStyle: "italic",
+    color: "#333",
+  },
+  bookDetails: {
+    fontSize: width * 0.04,
+    color: "#555",
+  },
+  bookDescription: {
+    fontSize: width * 0.04,
+    color: "#444",
+    marginTop: height * 0.02,
+    paddingHorizontal: width * 0.05,
   },
   manualInputRow: {
     flexDirection: "row",
@@ -152,6 +311,18 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: {
     color: "black",
+    fontWeight: "bold",
+    fontSize: width * 0.04,
+  },
+  viewInfoButton: {
+    marginTop: height * 0.02,
+    backgroundColor: "#0078D7",
+    paddingVertical: height * 0.015,
+    paddingHorizontal: width * 0.2,
+    borderRadius: width * 0.05,
+  },
+  viewInfoButtonText: {
+    color: "white",
     fontWeight: "bold",
     fontSize: width * 0.04,
   },

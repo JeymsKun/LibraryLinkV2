@@ -1,11 +1,29 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { View, Image, TouchableOpacity, Text, Dimensions } from "react-native";
-
-const { height } = Dimensions.get("window");
+import { View, Image, TouchableOpacity, Text } from "react-native";
 
 export default function UserLayout() {
+  const [time, setTime] = useState("");
+
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      const hours = now.getHours();
+      const minutes = now.getMinutes();
+      const ampm = hours >= 12 ? "PM" : "AM";
+      const formattedHours = hours % 12 === 0 ? 12 : hours % 12;
+      const formattedMinutes = minutes < 10 ? `0${minutes}` : minutes;
+      const formattedTime = `${formattedHours}:${formattedMinutes} ${ampm}`;
+      setTime(formattedTime);
+    };
+
+    updateTime(); // set initial time
+    const interval = setInterval(updateTime, 1000);
+
+    return () => clearInterval(interval); // cleanup
+  }, []);
+
   return (
     <Tabs
       screenOptions={({ route }) => ({
@@ -22,19 +40,16 @@ export default function UserLayout() {
             iconName = "ellipsis-horizontal-circle";
           }
 
-          return (
-            <Ionicons name={iconName} size={height * 0.03} color={color} />
-          );
+          return <Ionicons name={iconName} size={20} color={color} />;
         },
         tabBarActiveTintColor: "#3b82f6",
         tabBarInactiveTintColor: "gray",
         tabBarStyle: {
-          height: height * 0.08,
-          paddingBottom: height * 0.02,
-          paddingTop: height * 0.005,
+          justifyContent: "center",
+          alignItems: "center",
         },
         tabBarLabelStyle: {
-          fontSize: height * 0.015,
+          fontSize: 12,
           fontWeight: "600",
         },
         headerStyle: {
@@ -90,7 +105,7 @@ export default function UserLayout() {
           ),
           headerRight: () => (
             <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Text style={{ fontSize: 14, marginRight: 10 }}>00:00 AM</Text>
+              <Text style={{ fontSize: 14, marginRight: 10 }}>{time}</Text>
               <Image
                 source={require("../../../assets/calendar-icon.png")}
                 style={{ width: 28, height: 28, marginRight: 10 }}

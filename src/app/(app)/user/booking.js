@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
   View,
   Text,
@@ -7,25 +7,90 @@ import {
   Modal,
   FlatList,
   Dimensions,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useBooking } from "../../../context/BookingContext";
+import { useAuth } from "../../../context/AuthContext";
+import { supabase } from "../../../lib/supabase";
+import { useFocusEffect } from "@react-navigation/native";
 
 const { width, height } = Dimensions.get("window");
 
 export default function BookCard() {
+  const { userData } = useAuth();
+  const { bookings } = useBooking();
+  const [lastBookedTitle, setLastBookedTitle] = useState("");
   const [selectedDays, setSelectedDays] = useState("1");
   const [isPickerVisible, setPickerVisible] = useState(false);
   const [isSuccessVisible, setSuccessVisible] = useState(false);
 
   const days = [...Array(6).keys()].map((i) => `${i + 1}`);
 
+  useFocusEffect(
+    useCallback(() => {
+      const loadBookings = async () => {
+        const { data: userInfo, error } = await supabase
+          .from("users")
+          .select("user_id")
+          .eq("email", userData?.email)
+          .single();
+
+        if (userInfo) {
+          await fetchBookings(userInfo.user_id);
+        }
+      };
+
+      loadBookings();
+    }, [userData?.email])
+  );
+
+  const handleConfirmBooking = async (book) => {
+    try {
+      if (!userData?.email) {
+        alert("User not authenticated. Please log in.");
+        return;
+      }
+
+      const { data: userInfo, error: getUserError } = await supabase
+        .from("users")
+        .select("user_id")
+        .eq("email", userData.email)
+        .single();
+
+      if (getUserError || !userInfo) {
+        console.error("User lookup error: ", getUserError);
+        alert("No matching user record found for this email.");
+        return;
+      }
+
+      const userId = userInfo.user_id;
+      console.log("Using user ID from email lookup:", userId);
+
+      const { error: bookingError } = await supabase.from("user_books").insert([
+        {
+          user_id: userId,
+          books_id: book.books_id,
+          days: parseInt(selectedDays),
+          booking_date: new Date(),
+          status: "booked",
+        },
+      ]);
+
+      if (bookingError) {
+        throw new Error(bookingError.message);
+      }
+
+      setSuccessVisible(true);
+      setLastBookedTitle(book.title);
+    } catch (error) {
+      console.error("Error booking the book:", error.message);
+    }
+  };
+
   const handleSelectDay = (day) => {
     setSelectedDays(day);
     setPickerVisible(false);
-  };
-
-  const handleConfirmBooking = () => {
-    setSuccessVisible(true);
   };
 
   const closeSuccessMessage = () => {
@@ -34,66 +99,80 @@ export default function BookCard() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.card}>
-        <View style={styles.imagePlaceholder}>
-          <View style={styles.lineDiagonal1} />
-          <View style={styles.lineDiagonal2} />
-        </View>
-
-        <View style={styles.bookDetails}>
-          <Text style={styles.title}>Book Title</Text>
-          <Text style={styles.author}>Author</Text>
-
-          <View style={styles.row}>
-            <Text style={styles.label}>Select days</Text>
-            <TouchableOpacity
-              style={styles.pickerWrapper}
-              onPress={() => setPickerVisible(true)}
-            >
-              <Text style={styles.pickerText}>{selectedDays}</Text>
-            </TouchableOpacity>
-            <Text style={styles.maxText}>(max. 6 days)</Text>
-          </View>
-
-          <Text style={styles.moreInfo}>More Information:</Text>
-          <View style={styles.underline} />
-        </View>
-
-        {/* Custom Picker Modal */}
-        <Modal
-          visible={isPickerVisible}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={() => setPickerVisible(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <FlatList
-                data={days}
-                keyExtractor={(item) => item}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={styles.modalItem}
-                    onPress={() => handleSelectDay(item)}
-                  >
-                    <Text style={styles.modalItemText}>{item}</Text>
-                  </TouchableOpacity>
-                )}
+      {bookings.length === 0 ? (
+        <Text style={{ fontSize: 16, fontStyle: "italic", marginTop: 20 }}>
+          You don’t have any bookings right now.
+        </Text>
+      ) : (
+        bookings.map((book) => (
+          <View key={book.books_id} style={styles.card}>
+            <View style={styles.imagePlaceholder}>
+              <Image
+                source={{
+                  uri: supabase.storage
+                    .from("library")
+                    .getPublicUrl(book.cover_image_url.trim()).data.publicUrl,
+                }}
+                style={styles.image}
+                resizeMode="cover"
               />
             </View>
+            <View style={styles.bookDetails}>
+              <Text style={styles.title}>{book.title}</Text>
+              <Text style={styles.author}>{book.author}</Text>
+
+              <View style={styles.row}>
+                <Text style={styles.label}>Select days</Text>
+                <TouchableOpacity
+                  style={styles.pickerWrapper}
+                  onPress={() => setPickerVisible(true)}
+                >
+                  <Text style={styles.pickerText}>{selectedDays}</Text>
+                </TouchableOpacity>
+                <Text style={styles.maxText}>(max. 6 days)</Text>
+              </View>
+
+              <Text style={styles.moreInfo}>More Information:</Text>
+              <Text style={styles.moreInfo}>{book.description}</Text>
+              <View style={styles.underline} />
+            </View>
+
+            <Modal
+              visible={isPickerVisible}
+              transparent={true}
+              animationType="fade"
+              onRequestClose={() => setPickerVisible(false)}
+            >
+              <View style={styles.modalOverlay}>
+                <View style={styles.modalContent}>
+                  <FlatList
+                    data={days}
+                    keyExtractor={(item) => item}
+                    renderItem={({ item }) => (
+                      <TouchableOpacity
+                        style={styles.modalItem}
+                        onPress={() => handleSelectDay(item)}
+                      >
+                        <Text style={styles.modalItemText}>{item}</Text>
+                      </TouchableOpacity>
+                    )}
+                  />
+                </View>
+              </View>
+            </Modal>
           </View>
-        </Modal>
-      </View>
+        ))
+      )}
 
-      {/* Confirm Booking Button */}
-      <TouchableOpacity
-        style={styles.confirmButton}
-        onPress={handleConfirmBooking}
-      >
-        <Text style={styles.confirmButtonText}>Confirm Booking</Text>
-      </TouchableOpacity>
+      {bookings.length > 0 && (
+        <TouchableOpacity
+          style={styles.confirmButton}
+          onPress={() => handleConfirmBooking(bookings[0])}
+        >
+          <Text style={styles.confirmButtonText}>Confirm Booking</Text>
+        </TouchableOpacity>
+      )}
 
-      {/* Success Message Modal */}
       <Modal
         visible={isSuccessVisible}
         transparent={true}
@@ -104,7 +183,7 @@ export default function BookCard() {
           <View style={styles.successBox}>
             <Text style={styles.successText}>
               <Text style={styles.successBold}>Success!</Text> You have booked{" "}
-              <Text style={styles.successItalic}>"title of the book"</Text>.
+              <Text style={styles.successItalic}>"{lastBookedTitle}"</Text>.
             </Text>
             <TouchableOpacity
               style={styles.closeButton}
@@ -148,6 +227,10 @@ const styles = StyleSheet.create({
     borderColor: "#000",
     position: "relative",
     overflow: "hidden",
+  },
+  image: {
+    width: "100%",
+    height: "100%",
   },
   lineDiagonal1: {
     position: "absolute",

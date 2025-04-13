@@ -18,14 +18,18 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../context/AuthContext";
 
 export default function LibraryUserSignup() {
-  const [username, setUsername] = useState("");
+  const router = useRouter();
+  const { signup } = useAuth();
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [idNumber, setIdNumber] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
-  const router = useRouter();
-  const { register } = useAuth();
+  const [passwordMismatch, setPasswordMismatch] = useState(false);
 
   useEffect(() => {
     const show = Keyboard.addListener("keyboardDidShow", () =>
@@ -40,21 +44,42 @@ export default function LibraryUserSignup() {
     };
   }, []);
 
+  useEffect(() => {
+    setPasswordMismatch(
+      password.length > 0 &&
+        confirmPassword.length > 0 &&
+        password !== confirmPassword
+    );
+  }, [password, confirmPassword]);
+
   const handleRegister = async () => {
-    if (!username || !password || !idNumber) {
+    if (!email || !password || !idNumber || !confirmPassword) {
       Alert.alert("Error", "Please fill out all fields.");
       return;
+    }
+
+    if (password !== confirmPassword) {
+      setPasswordMismatch(true);
+      Alert.alert("Error", "Passwords do not match.");
+      return;
+    } else {
+      setPasswordMismatch(false);
     }
 
     setIsLoading(true);
 
     try {
-      const result = await register(
-        { email: username, password, idNumber },
-        "user"
-      );
+      const result = await signup({
+        email,
+        password,
+        idNumber,
+        fullName,
+      });
+
       if (!result.success) {
         Alert.alert("Signup Failed", result.error || "Please try again.");
+      } else {
+        Alert.alert("Success", "Account created!");
       }
     } catch (error) {
       Alert.alert("Error", "Something went wrong during signup.");
@@ -65,6 +90,10 @@ export default function LibraryUserSignup() {
 
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);
+  };
+
+  const toggleConfirmPasswordVisibility = () => {
+    setShowConfirmPassword(!showConfirmPassword);
   };
 
   const goBack = () => {
@@ -113,18 +142,58 @@ export default function LibraryUserSignup() {
 
         <View style={[styles.formContainer, { flex: keyboardVisible ? 0 : 1 }]}>
           <View style={styles.inputWrapper}>
-            {/* Username */}
+            {/* Full Name */}
             <View style={styles.inputContainer}>
               <View style={styles.iconContainer}>
-                <Ionicons name="person-outline" size={20} color="#777" />
+                <Ionicons name="person-circle-outline" size={20} color="#777" />
               </View>
               <TextInput
                 style={styles.input}
-                placeholder="Username"
-                value={username}
-                onChangeText={setUsername}
-                autoCapitalize="none"
+                placeholder="Full Name"
+                value={fullName}
+                onChangeText={setFullName}
                 placeholderTextColor="#999"
+                numberOfLines={1}
+                multiline={false}
+                scrollEnabled={false}
+                textAlignVertical="center"
+              />
+            </View>
+            {/* ID Number */}
+            <View style={styles.inputContainer}>
+              <View style={styles.iconContainer}>
+                <Ionicons name="card-outline" size={20} color="#777" />
+              </View>
+              <TextInput
+                style={styles.input}
+                placeholder="ID Number (School/University)"
+                value={idNumber}
+                onChangeText={setIdNumber}
+                placeholderTextColor="#999"
+                keyboardType="numeric"
+                numberOfLines={1}
+                multiline={false}
+                scrollEnabled={false}
+                textAlignVertical="center"
+              />
+            </View>
+            {/* Email Address */}
+            <View style={styles.inputContainer}>
+              <View style={styles.iconContainer}>
+                <Ionicons name="mail-outline" size={20} color="#777" />
+              </View>
+              <TextInput
+                style={styles.input}
+                placeholder="Email Address"
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                placeholderTextColor="#999"
+                numberOfLines={1}
+                multiline={false}
+                scrollEnabled={false}
+                textAlignVertical="center"
               />
             </View>
 
@@ -134,12 +203,16 @@ export default function LibraryUserSignup() {
                 <Ionicons name="lock-closed-outline" size={20} color="#777" />
               </View>
               <TextInput
-                style={styles.input}
+                style={[styles.input, passwordMismatch && styles.inputError]}
                 placeholder="Password"
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
                 placeholderTextColor="#999"
+                numberOfLines={1}
+                multiline={false}
+                scrollEnabled={false}
+                textAlignVertical="center"
               />
               <TouchableOpacity
                 onPress={togglePasswordVisibility}
@@ -153,19 +226,33 @@ export default function LibraryUserSignup() {
               </TouchableOpacity>
             </View>
 
-            {/* ID Number */}
+            {/* Confirm Password */}
             <View style={styles.inputContainer}>
               <View style={styles.iconContainer}>
-                <Ionicons name="card-outline" size={20} color="#777" />
+                <Ionicons name="lock-closed-outline" size={20} color="#777" />
               </View>
               <TextInput
-                style={styles.input}
-                placeholder="ID Number"
-                value={idNumber}
-                onChangeText={setIdNumber}
+                style={[styles.input, passwordMismatch && styles.inputError]}
+                placeholder="Confirm Password"
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry={!showConfirmPassword}
                 placeholderTextColor="#999"
-                keyboardType="numeric"
+                numberOfLines={1}
+                multiline={false}
+                scrollEnabled={false}
+                textAlignVertical="center"
               />
+              <TouchableOpacity
+                onPress={toggleConfirmPasswordVisibility}
+                style={styles.passwordIcon}
+              >
+                <Ionicons
+                  name={showConfirmPassword ? "eye-off-outline" : "eye-outline"}
+                  size={20}
+                  color="#777"
+                />
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -202,7 +289,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "flex-start",
     alignItems: "center",
-    marginTop: 20,
   },
   logoContainer: {
     alignItems: "center",
@@ -214,12 +300,12 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   logoImage: {
-    width: 150,
-    height: 150,
+    width: 130,
+    height: 130,
   },
   logoOfficial: {
     width: 200,
-    height: 150,
+    height: 100,
   },
   formContainer: {
     width: "100%",
@@ -238,7 +324,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   logoOfficialContainer: {
-    marginVertical: -10,
+    marginVertical: -15,
     alignItems: "center",
   },
   iconContainer: {
@@ -277,5 +363,9 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontWeight: "600",
     fontSize: 16,
+  },
+  inputError: {
+    borderBottomWidth: 1,
+    borderBottomColor: "red",
   },
 });

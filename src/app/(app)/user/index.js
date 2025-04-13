@@ -1,37 +1,101 @@
-import React from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   View,
   StyleSheet,
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
+  Image,
+  Text,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { supabase } from "../../../lib/supabase";
+import { useFocusEffect } from "@react-navigation/native";
 
 export default function UserDashboard() {
   const router = useRouter();
+  const [books, setBooks] = useState([]);
+  useFocusEffect(
+    useCallback(() => {
+      const fetchBooks = async () => {
+        const { data, error } = await supabase
+          .from("books")
+          .select("books_id, title, cover_image_url");
+
+        if (error) {
+          console.error("Error fetching books:", error);
+          return;
+        }
+
+        const booksWithCoverUrls = data.map((book) => {
+          const coverUrl = supabase.storage
+            .from("library")
+            .getPublicUrl(book.cover_image_url.trim()).data.publicUrl;
+
+          return {
+            ...book,
+            coverUrl,
+          };
+        });
+
+        setBooks(booksWithCoverUrls);
+      };
+
+      fetchBooks();
+    }, [])
+  );
+
+  useEffect(() => {
+    const fetchBooks = async () => {
+      const { data, error } = await supabase
+        .from("books")
+        .select("books_id, title, cover_image_url");
+
+      if (error) {
+        console.error("Error fetching books:", error);
+        return;
+      }
+
+      const booksWithCoverUrls = data.map((book) => {
+        const coverUrl = supabase.storage
+          .from("library")
+          .getPublicUrl(book.cover_image_url.trim()).data.publicUrl;
+
+        return {
+          ...book,
+          coverUrl,
+        };
+      });
+
+      setBooks(booksWithCoverUrls);
+    };
+
+    fetchBooks();
+  }, []);
 
   const handleBookPress = (id) => {
-    console.log(`Book container ${id} clicked!`);
-    router.push("../screens/about");
+    console.log(`Book ${id} clicked`);
+    router.push(`../screens/about?id=${id}`);
   };
-
-  const bookContainers = Array.from({ length: 10 }, (_, i) => i + 1);
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollView}>
         <View style={styles.bookGrid}>
-          {bookContainers.map((id) => (
+          {books.map((book) => (
             <TouchableOpacity
-              key={id}
+              key={book.books_id}
               style={styles.bookContainer}
-              onPress={() => handleBookPress(id)}
+              onPress={() => handleBookPress(book.books_id)}
             >
-              <View style={styles.cross}>
-                <View style={styles.crossLine1} />
-                <View style={styles.crossLine2} />
-              </View>
+              <Image
+                source={{ uri: book.coverUrl }}
+                style={styles.coverImage}
+                resizeMode="cover"
+              />
+              <Text style={styles.bookTitle} numberOfLines={2}>
+                {book.title}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -56,7 +120,7 @@ const styles = StyleSheet.create({
   },
   bookContainer: {
     width: "45%",
-    aspectRatio: 0.7,
+    aspectRatio: 0.65,
     backgroundColor: "#fff",
     borderRadius: 12,
     marginBottom: 16,
@@ -65,32 +129,17 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 30,
-  },
-  cross: {
-    position: "relative",
-    width: "170%",
-    height: "100%",
-    justifyContent: "center",
-    alignItems: "center",
     overflow: "hidden",
   },
-  crossLine1: {
-    position: "absolute",
+  coverImage: {
     width: "100%",
-    bottom: 100,
-    height: 1,
-    backgroundColor: "gray",
-    transform: [{ rotate: "56deg" }],
+    height: "80%",
   },
-  crossLine2: {
-    position: "absolute",
-    width: "100%",
-    top: 104,
-    height: 1,
-    backgroundColor: "gray",
-    transform: [{ rotate: "-55deg" }],
+  bookTitle: {
+    fontSize: 14,
+    padding: 8,
+    fontWeight: "600",
+    textAlign: "center",
+    color: "#333",
   },
 });

@@ -113,6 +113,7 @@ export default function StaffLayout() {
         name="logout"
         options={{
           title: "Log Out",
+          headerShown: false,
           drawerIcon: ({ color, size }) => (
             <Ionicons name="log-out-outline" size={size} color={color} />
           ),
