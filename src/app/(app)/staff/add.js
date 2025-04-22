@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Image,
   ScrollView,
+  RefreshControl,
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -15,28 +16,59 @@ import * as Clipboard from "expo-clipboard";
 import * as FileSystem from "expo-file-system";
 import * as MediaLibrary from "expo-media-library";
 import { MaterialIcons } from "@expo/vector-icons";
-import genres from "../../../constants/genres";
-import uploadBookFiles from "../components/uploadBookFiles";
 import { supabase } from "../../../lib/supabase";
 import { useAuth } from "../../../context/AuthContext";
+import { useSelector, useDispatch } from "react-redux";
+import { setField, resetForm } from "../../../redux/slices/bookFormSlice";
+import { useQuery } from "@tanstack/react-query";
+import { fetchGenres } from "../../../queries/genres";
+import { fetchStaffData } from "../../../queries/staff";
+import { useAddBookMutation } from "../../../hooks/useAddBookMutation";
 
 export default function AddBook() {
+  const { mutate: uploadFiles } = useAddBookMutation();
+  const {
+    title,
+    author,
+    genre,
+    genreId,
+    isbn,
+    publisher,
+    publishedDate,
+    copies,
+    description,
+    barcode,
+    barcodeCode,
+    coverImage,
+    images,
+  } = useSelector((state) => state.bookForm);
+  const dispatch = useDispatch();
   const { userData } = useAuth();
-  const [user, setUser] = useState(null);
-  const [title, setTitle] = useState("");
-  const [author, setAuthor] = useState("");
-  const [genre, setGenre] = useState("");
-  const [isbn, setIsbn] = useState("");
-  const [publisher, setPublisher] = useState("");
-  const [publishedDate, setPublishedDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [images, setImages] = useState([]);
-  const [copies, setCopies] = useState("");
-  const [description, setDescription] = useState("");
-  const [barcode, setBarcode] = useState(null);
-  const [barcodeCode, setBarcodeCode] = useState("");
-  const [coverImage, setCoverImage] = useState(null);
   const [isDateSet, setIsDateSet] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const {
+    data: staffData,
+    error: staffError,
+    refetch: refetchStaffData,
+  } = useQuery({
+    queryKey: ["staff", userData?.email],
+    queryFn: () => fetchStaffData(userData?.email),
+    enabled: !!userData?.email,
+  });
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await refetchStaffData();
+    setRefreshing(false);
+  };
+
+  const { data: genres = [] } = useQuery({
+    queryKey: ["genres"],
+    queryFn: fetchGenres,
+    staleTime: 1000 * 60 * 5,
+  });
 
   useEffect(() => {
     if (userData) {
@@ -45,89 +77,124 @@ export default function AddBook() {
   }, [userData]);
 
   const handleSave = async () => {
+    if (!title) {
+      alert("Please fill in the required field: Title.");
+      return;
+    } else if (!author) {
+      alert("Please fill in the required field: Author.");
+      return;
+    } else if (!genre) {
+      alert("Please select a genre.");
+      return;
+    } else if (!copies) {
+      alert("Please specify the number of copies.");
+      return;
+    } else if (!publisher) {
+      alert("Please fill in the required field: Publisher.");
+      return;
+    } else if (!publishedDate) {
+      alert("Please set the published date.");
+      return;
+    }
+
     try {
       if (!userData?.email) {
         alert("User not authenticated. Please log in.");
         return;
       }
 
-      const { data: staffData, error: staffError } = await supabase
-        .from("staff")
-        .select("staff_uuid")
-        .eq("email", userData.email)
-        .single();
+      if (staffError) {
+        alert("Failed to fetch staff data. Please try again.");
+        console.error("Staff data error:", staffError);
+        return;
+      }
 
-      if (staffError || !staffData) {
-        console.error("Staff lookup error:", staffError);
+      if (!staffData?.staff_uuid) {
         alert("No matching staff record found for this email.");
         return;
       }
 
       const staffUuid = staffData.staff_uuid;
-      console.log("Using staff UUID from email lookup:", staffUuid);
 
-      const { coverUrl, imageUrls, barcodeUrl, infoUrl } =
-        await uploadBookFiles({
+      uploadFiles(
+        {
           coverImage,
           images,
           barcode,
-          title,
-          author,
-          genre,
-          isbn,
-          publisher,
-          publishedDate,
-          copies,
-          description,
-          barcodeCode,
-        });
-
-      const { error: dbError } = await supabase.from("books").insert([
-        {
-          title,
-          author,
-          genre,
-          isbn,
-          publisher,
-          published_date: publishedDate,
-          copies: parseInt(copies),
-          description,
-          barcode_code: barcodeCode,
-          cover_image_url: coverUrl,
-          image_urls: imageUrls,
-          staff_uuid: staffUuid, // ✅ Now the correct UUID from staff table
         },
-      ]);
+        {
+          onSuccess: async ({ coverUrl, imageUrls }) => {
+            console.log("Upload successful. Saving to database...");
+            const { data: insertedBook, error: dbError } = await supabase
+              .from("books")
+              .insert([
+                {
+                  title,
+                  author,
+                  genre_id: genreId,
+                  isbn,
+                  publisher,
+                  published_date: publishedDate
+                    ? new Date(publishedDate).toISOString()
+                    : null,
+                  copies: parseInt(copies),
+                  description,
+                  barcode_code: barcodeCode,
+                  cover_image_url: coverUrl,
+                  image_urls: imageUrls,
+                  staff_uuid: staffUuid,
+                },
+              ])
+              .select();
 
-      if (dbError) {
-        console.error("Database Error:", dbError);
-        alert("Error saving book. Please try again.");
-        return;
-      }
+            const bookId = insertedBook?.[0]?.books_id;
 
-      alert("Book added successfully!");
-      handleClear();
+            if (bookId) {
+              const { error: bookGenreError } = await supabase
+                .from("book_genres")
+                .insert([
+                  {
+                    books_id: bookId,
+                    genre_id: genreId,
+                  },
+                ]);
+
+              if (bookGenreError) {
+                console.error("Error linking book to genre:", bookGenreError);
+              }
+            }
+
+            if (dbError) {
+              console.error("Error inserting book:", dbError);
+              alert("Error saving book.");
+              setIsUploading(false);
+              return;
+            }
+
+            alert("Book added successfully!");
+            handleClear();
+          },
+          onError: (error) => {
+            console.error("Upload failed:", error);
+            alert("Something went wrong while saving the book.");
+          },
+        }
+      );
     } catch (error) {
-      console.error("Error saving book:", error);
-      alert("Error saving book. Please try again.");
+      console.error("Unexpected error:", error);
+      alert("Something went wrong while saving the book.");
+    } finally {
+      setIsUploading(false);
     }
   };
 
   const handleClear = () => {
-    setTitle("");
-    setAuthor("");
-    setGenre("");
-    setIsbn("");
-    setPublisher("");
-    setIsDateSet(false);
-    setImages([]);
-    setCopies("");
-    setDescription("");
-    const newCode = generateFallbackBarcode();
-    const newUrl = getBarcodeUrl(newCode);
-    setBarcodeCode(newCode);
-    setBarcode(newUrl);
-    setCoverImage(null);
+    dispatch(resetForm());
+
+    const code = isbn || generateFallbackBarcode();
+    dispatch(setField({ field: "barcodeCode", value: code }));
+    const url = getBarcodeUrl(code);
+    dispatch(setField({ field: "barcode", value: url }));
   };
 
   const copyToClipboard = async (text) => {
@@ -177,10 +244,10 @@ export default function AddBook() {
 
   useEffect(() => {
     const code = isbn || generateFallbackBarcode();
-    setBarcodeCode(code);
+    dispatch(setField({ field: "barcodeCode", value: code }));
     const url = getBarcodeUrl(code);
-    setBarcode(url);
-  }, [isbn, title]);
+    dispatch(setField({ field: "barcode", value: url }));
+  }, [isbn, title, dispatch]);
 
   const openCameraForCover = async () => {
     const result = await ImagePicker.launchCameraAsync({
@@ -189,7 +256,7 @@ export default function AddBook() {
     });
 
     if (!result.canceled) {
-      setCoverImage(result.assets[0].uri);
+      dispatch(setField({ field: "coverImage", value: result.assets[0].uri })); // Update coverImage in Redux
     }
   };
 
@@ -205,7 +272,12 @@ export default function AddBook() {
     });
 
     if (!result.canceled) {
-      setImages((prev) => [...prev, result.assets[0].uri]);
+      dispatch(
+        setField({
+          field: "images",
+          value: [...images, result.assets[0].uri],
+        })
+      );
     }
   };
 
@@ -217,7 +289,7 @@ export default function AddBook() {
     });
 
     if (!result.canceled) {
-      setCoverImage(result.assets[0].uri);
+      dispatch(setField({ field: "coverImage", value: result.assets[0].uri }));
     }
   };
 
@@ -231,10 +303,12 @@ export default function AddBook() {
 
       if (!result.canceled) {
         const selectedImages = result.assets.map((asset) => asset.uri);
-        setImages((prev) => {
-          const newImages = [...prev, ...selectedImages];
-          return newImages.slice(0, 5);
-        });
+        dispatch(
+          setField({
+            field: "images",
+            value: [...images, ...selectedImages].slice(0, 5),
+          })
+        );
       }
     } else {
       alert("You can upload a maximum of 5 images.");
@@ -248,7 +322,9 @@ export default function AddBook() {
   const onDateChange = (event, selectedDate) => {
     setShowDatePicker(false);
     if (selectedDate) {
-      setPublishedDate(selectedDate);
+      dispatch(
+        setField({ field: "publishedDate", value: selectedDate.toISOString() })
+      );
       setIsDateSet(true);
     }
   };
@@ -258,6 +334,9 @@ export default function AddBook() {
       style={styles.container}
       contentContainerStyle={styles.contentContainer}
       showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+      }
     >
       <Text style={styles.header}>
         Fill in the details to add a new book to the library collection.
@@ -267,7 +346,9 @@ export default function AddBook() {
       <TextInput
         style={styles.input}
         value={title}
-        onChangeText={setTitle}
+        onChangeText={(text) =>
+          dispatch(setField({ field: "title", value: text }))
+        }
         placeholder="Enter book title"
       />
 
@@ -275,31 +356,38 @@ export default function AddBook() {
       <TextInput
         style={styles.input}
         value={author}
-        onChangeText={setAuthor}
+        onChangeText={(text) =>
+          dispatch(setField({ field: "author", value: text }))
+        }
         placeholder="Enter author name"
       />
 
-      <Text style={styles.label}>Category/Genre:</Text>
-      <Picker
-        selectedValue={genre}
-        onValueChange={(itemValue) => setGenre(itemValue)}
-        style={styles.picker}
-      >
-        <Picker.Item label="Select a genre" value="" />
-        {genres.map((g) => (
-          <Picker.Item
-            key={g}
-            label={g}
-            value={g.toLowerCase().replace(/ /g, "-")}
-          />
-        ))}
-      </Picker>
+      <Text style={styles.label}>Genre:</Text>
+      <View style={styles.pickerWrapper}>
+        <Picker
+          selectedValue={genreId}
+          onValueChange={(selectedId) => {
+            const selectedGenre = genres.find((g) => g.genre_id === selectedId);
+            dispatch(
+              setField({ field: "genre", value: selectedGenre?.name || "" })
+            );
+            dispatch(setField({ field: "genreId", value: selectedId }));
+          }}
+        >
+          <Picker.Item label="Select a genre" value="" />
+          {genres.map((g) => (
+            <Picker.Item key={g.genre_id} label={g.name} value={g.genre_id} />
+          ))}
+        </Picker>
+      </View>
 
       <Text style={styles.label}>ISBN Number (optional):</Text>
       <TextInput
         style={styles.input}
         value={isbn}
-        onChangeText={setIsbn}
+        onChangeText={(text) =>
+          dispatch(setField({ field: "isbn", value: text }))
+        }
         placeholder="Enter ISBN number"
       />
 
@@ -307,7 +395,9 @@ export default function AddBook() {
       <TextInput
         style={styles.input}
         value={publisher}
-        onChangeText={setPublisher}
+        onChangeText={(text) =>
+          dispatch(setField({ field: "publisher", value: text }))
+        }
         placeholder="Enter publisher"
       />
 
@@ -316,12 +406,14 @@ export default function AddBook() {
         <Text
           style={[styles.dateInput, { color: isDateSet ? "#000" : "#999" }]}
         >
-          {isDateSet ? publishedDate.toDateString() : "Set Published Date"}
+          {isDateSet && publishedDate
+            ? new Date(publishedDate).toDateString()
+            : "Set Published Date"}
         </Text>
       </TouchableOpacity>
       {showDatePicker && (
         <DateTimePicker
-          value={publishedDate}
+          value={publishedDate ? new Date(publishedDate) : new Date()}
           mode="date"
           display="default"
           onChange={onDateChange}
@@ -411,7 +503,7 @@ export default function AddBook() {
         )}
       </TouchableOpacity>
 
-      {barcode && (
+      {barcode ? (
         <>
           <Text style={styles.label}>Generated Barcode:</Text>
           <View style={styles.barcodeContainer}>
@@ -436,11 +528,7 @@ export default function AddBook() {
               placeholderTextColor="#999"
             />
             <View style={styles.barcodeIcons}>
-              <TouchableOpacity
-                onPress={() =>
-                  copyToClipboard(isbn || generateFallbackBarcode())
-                }
-              >
+              <TouchableOpacity onPress={() => copyToClipboard(barcodeCode)}>
                 <MaterialIcons
                   name="content-copy"
                   size={22}
@@ -454,13 +542,19 @@ export default function AddBook() {
             </View>
           </View>
         </>
+      ) : (
+        <Text style={{ textAlign: "center", color: "#999" }}>
+          Barcode will be generated here.
+        </Text>
       )}
 
       <Text style={styles.label}>Number of Copies:</Text>
       <TextInput
         style={styles.input}
         value={copies}
-        onChangeText={setCopies}
+        onChangeText={(text) =>
+          dispatch(setField({ field: "copies", value: text }))
+        }
         placeholder="Enter number of copies"
         keyboardType="numeric"
       />
@@ -469,7 +563,9 @@ export default function AddBook() {
       <TextInput
         style={styles.input}
         value={description}
-        onChangeText={setDescription}
+        onChangeText={(text) =>
+          dispatch(setField({ field: "description", value: text }))
+        }
         placeholder="Add a short description..."
         multiline
       />
@@ -682,5 +778,15 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255, 255, 255, 0.7)",
     borderRadius: 15,
     padding: 5,
+  },
+  pickerWrapper: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 5,
+    paddingHorizontal: 10,
+    justifyContent: "center",
+    height: 40,
+    marginBottom: 15,
+    backgroundColor: "#fff",
   },
 });

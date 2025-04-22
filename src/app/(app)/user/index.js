@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   StyleSheet,
@@ -7,56 +7,82 @@ import {
   TouchableOpacity,
   Image,
   Text,
+  RefreshControl,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { supabase } from "../../../lib/supabase";
 import { useFocusEffect } from "@react-navigation/native";
+import { useAuth } from "../../../context/AuthContext";
+
+const fetchUserRecord = async (userId) => {
+  try {
+    const { data: userRecord, error } = await supabase
+      .from("users")
+      .select("*")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (error) {
+      console.error("Error fetching user record:", error);
+      return null;
+    }
+
+    if (userRecord) {
+      return userRecord;
+    } else {
+      console.warn("User record not found for userId:", userId);
+      return null;
+    }
+  } catch (err) {
+    console.error("Unexpected error fetching user record:", err);
+    return null;
+  }
+};
 
 export default function UserDashboard() {
   const router = useRouter();
-  const [books, setBooks] = useState([]);
-  useFocusEffect(
-    useCallback(() => {
-      const fetchBooks = async () => {
-        const { data, error } = await supabase
-          .from("books")
-          .select("books_id, title, cover_image_url");
+  const { userId } = useAuth();
+  const [recentBooks, setRecentBooks] = useState([]);
+  const [userRecord, setUserRecord] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-        if (error) {
-          console.error("Error fetching books:", error);
-          return;
-        }
+  const fetchRecentViewedBooks = async () => {
+    console.log("Fetching recent viewed books for userId:", userId);
 
-        const booksWithCoverUrls = data.map((book) => {
-          const coverUrl = supabase.storage
-            .from("library")
-            .getPublicUrl(book.cover_image_url.trim()).data.publicUrl;
+    if (!userId) return;
 
-          return {
-            ...book,
-            coverUrl,
-          };
-        });
+    try {
+      const userData = await fetchUserRecord(userId);
+      setUserRecord(userData);
 
-        setBooks(booksWithCoverUrls);
-      };
+      const { data: recentViewData, error: recentError } = await supabase
+        .from("user_library")
+        .select("books_id, viewed_at")
+        .eq("user_id", userId)
+        .order("viewed_at", { ascending: false });
 
-      fetchBooks();
-    }, [])
-  );
-
-  useEffect(() => {
-    const fetchBooks = async () => {
-      const { data, error } = await supabase
-        .from("books")
-        .select("books_id, title, cover_image_url");
-
-      if (error) {
-        console.error("Error fetching books:", error);
+      if (recentError) {
+        console.error("Error fetching recent views:", recentError);
         return;
       }
 
-      const booksWithCoverUrls = data.map((book) => {
+      const bookIds = recentViewData.map((item) => item.books_id);
+      if (bookIds.length === 0) {
+        setRecentBooks([]);
+        return;
+      }
+
+      const { data: booksData, error: booksError } = await supabase
+        .from("books")
+        .select("books_id, title, cover_image_url")
+        .in("books_id", bookIds);
+
+      if (booksError) {
+        console.error("Error fetching books:", booksError);
+        return;
+      }
+
+      const booksWithUrls = booksData.map((book) => {
         const coverUrl = supabase.storage
           .from("library")
           .getPublicUrl(book.cover_image_url.trim()).data.publicUrl;
@@ -67,22 +93,39 @@ export default function UserDashboard() {
         };
       });
 
-      setBooks(booksWithCoverUrls);
-    };
+      setRecentBooks(booksWithUrls);
+    } catch (err) {
+      console.error("Error fetching recent books:", err);
+    }
+  };
 
-    fetchBooks();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchRecentViewedBooks();
+    }, [userId])
+  );
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchRecentViewedBooks();
+    setRefreshing(false);
+  };
 
   const handleBookPress = (id) => {
-    console.log(`Book ${id} clicked`);
     router.push(`../screens/about?id=${id}`);
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollView}>
+      <ScrollView
+        contentContainerStyle={styles.scrollView}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        <Text style={styles.sectionTitle}>Recently Viewed</Text>
         <View style={styles.bookGrid}>
-          {books.map((book) => (
+          {recentBooks.map((book) => (
             <TouchableOpacity
               key={book.books_id}
               style={styles.bookContainer}
@@ -112,11 +155,16 @@ const styles = StyleSheet.create({
   scrollView: {
     padding: 10,
   },
+  sectionTitle: {
+    fontSize: 14,
+    margin: 10,
+    color: "#222",
+  },
   bookGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
-    margin: 20,
+    marginHorizontal: 20,
   },
   bookContainer: {
     width: "45%",

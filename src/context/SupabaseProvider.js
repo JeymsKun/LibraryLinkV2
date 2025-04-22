@@ -1,5 +1,5 @@
-import { createContext, useContext } from 'react';
-import { supabase } from '../lib/supabase';
+import { createContext, useContext } from "react";
+import { supabase } from "../lib/supabase";
 
 const SupabaseContext = createContext(supabase);
 

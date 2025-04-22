@@ -4,9 +4,35 @@ import { supabase } from "../lib/supabase";
 
 const AuthContext = createContext({});
 
+const fetchUserRecord = async (email) => {
+  try {
+    const { data: userRecord, error } = await supabase
+      .from("users")
+      .select("*")
+      .eq("email", email)
+      .maybeSingle();
+
+    if (error) {
+      console.error("Error fetching user_id from users table:", error);
+      return null;
+    }
+
+    if (userRecord && userRecord.user_id) {
+      return userRecord.user_id;
+    } else {
+      console.warn("User record or user_id is missing:", userRecord);
+      return null;
+    }
+  } catch (err) {
+    console.error("Unexpected error fetching user record:", err);
+    return null;
+  }
+};
+
 export function AuthProvider({ children }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userData, setUserData] = useState(null);
+  const [userId, setUserId] = useState(null);
 
   useEffect(() => {
     const checkSession = async () => {
@@ -23,12 +49,18 @@ export function AuthProvider({ children }) {
         await SecureStore.setItemAsync("authData", JSON.stringify(authData));
         setIsAuthenticated(true);
         setUserData(session.user);
+
+        const fetchedUserId = await fetchUserRecord(session.user.email);
+        setUserId(fetchedUserId);
       } else {
         const authDataStr = await SecureStore.getItemAsync("authData");
         if (authDataStr) {
           const authData = JSON.parse(authDataStr);
           setIsAuthenticated(true);
           setUserData(authData.user);
+
+          const fetchedUserId = await fetchUserRecord(authData.user.email);
+          setUserId(fetchedUserId);
         }
       }
     };
@@ -46,10 +78,14 @@ export function AuthProvider({ children }) {
           await SecureStore.setItemAsync("authData", JSON.stringify(authData));
           setIsAuthenticated(true);
           setUserData(session.user);
+
+          const fetchedUserId = await fetchUserRecord(session.user.email);
+          setUserId(fetchedUserId);
         } else {
           await SecureStore.deleteItemAsync("authData");
           setIsAuthenticated(false);
           setUserData(null);
+          setUserId(null);
         }
       }
     );
@@ -98,6 +134,9 @@ export function AuthProvider({ children }) {
       setIsAuthenticated(true);
       setUserData(loginData.user);
 
+      const fetchedUserId = await fetchUserRecord(loginData.user.email);
+      setUserId(fetchedUserId);
+
       return { success: true };
     } catch (error) {
       console.log("Unexpected Error:", error);
@@ -130,6 +169,9 @@ export function AuthProvider({ children }) {
       setIsAuthenticated(true);
       setUserData(loginData.user);
 
+      const fetchedUserId = await fetchUserRecord(loginData.user.email);
+      setUserId(fetchedUserId);
+
       return { success: true };
     } catch (error) {
       console.log("Login error", error);
@@ -143,6 +185,7 @@ export function AuthProvider({ children }) {
       await supabase.auth.signOut();
       setIsAuthenticated(false);
       setUserData(null);
+      setUserId(null);
     } catch (error) {
       console.log("Logout error", error);
     }
@@ -200,6 +243,7 @@ export function AuthProvider({ children }) {
       value={{
         isAuthenticated,
         userData,
+        userId,
         loginStaff,
         loginUser,
         logout,

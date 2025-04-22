@@ -12,19 +12,60 @@ import {
   Platform,
   ScrollView,
   Image,
+  RefreshControl,
 } from "react-native";
 import { CameraView } from "expo-camera";
-import { supabase } from "../../../lib/supabase";
+import { useQuery } from "@tanstack/react-query";
+import { fetchBookInfo } from "../../../queries/bookInfo";
 
 const { width, height } = Dimensions.get("window");
 
 export default function BarcodeScan() {
-  const [bookInfo, setBookInfo] = useState(null);
   const [showBookInfo, setShowBookInfo] = useState(false);
   const [manualBarcode, setManualBarcode] = useState("");
   const scanLineAnimation = useRef(new Animated.Value(0)).current;
   const manualInputRef = useRef(null);
   const [scanning, setScanning] = useState(true);
+  const [barcode, setBarcode] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+  const [errorVisible, setErrorVisible] = useState(false);
+
+  useEffect(() => {
+    if (isError) {
+      setErrorVisible(true);
+      const timer = setTimeout(() => {
+        setErrorVisible(false);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [isError]);
+
+  const {
+    data: bookInfo,
+    isError,
+    refetch,
+  } = useQuery({
+    queryKey: ["bookInfo", barcode],
+    queryFn: () => fetchBookInfo(barcode),
+    enabled: !!barcode,
+    onError: (error) => {
+      console.error(error.message);
+      setErrorVisible(true);
+    },
+  });
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+
+    setBarcode("");
+    setManualBarcode("");
+    setScanning(true);
+    setShowBookInfo(false);
+
+    await refetch();
+
+    setRefreshing(false);
+  };
 
   useEffect(() => {
     Animated.loop(
@@ -48,48 +89,17 @@ export default function BarcodeScan() {
     outputRange: [0, height * 0.4],
   });
 
-  const fetchBookInfo = async (barcodeData) => {
-    try {
-      const { data, error } = await supabase
-        .from("books")
-        .select("*")
-        .eq("barcode_code", barcodeData)
-        .single();
-
-      if (error) {
-        console.error("Error fetching book data:", error);
-        return;
-      }
-
-      const coverUrl = supabase.storage
-        .from("library")
-        .getPublicUrl(data.cover_image_url.trim()).data.publicUrl;
-
-      const imageUrls = Array.isArray(data.image_urls)
-        ? data.image_urls.map(
-            (imgPath) =>
-              supabase.storage.from("library").getPublicUrl(imgPath.trim()).data
-                .publicUrl
-          )
-        : [];
-
-      console.log("✔️ Cover URL:", coverUrl);
-      console.log("🖼️ Image URLs:", imageUrls);
-
-      setBookInfo({
-        ...data,
-        coverUrl,
-        imageUrls,
-      });
-    } catch (err) {
-      console.error("Error while fetching book info:", err);
+  const handleBarcodeScanned = (data) => {
+    if (scanning) {
+      setScanning(false);
+      setBarcode(data);
     }
   };
 
   const handleManualInput = () => {
-    console.log("Manual Barcode Input: ", manualBarcode);
     if (manualBarcode.trim()) {
-      fetchBookInfo(manualBarcode.trim());
+      setBarcode(manualBarcode);
+      refetch();
     } else {
       console.log("No barcode entered");
     }
@@ -101,7 +111,12 @@ export default function BarcodeScan() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
     >
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        }
+      >
         <SafeAreaView style={styles.container}>
           <Text style={styles.instructionText}>
             Align the barcode within the frame to scan.
@@ -122,13 +137,7 @@ export default function BarcodeScan() {
                 "codabar",
               ],
             }}
-            onBarcodeScanned={({ data }) => {
-              if (scanning) {
-                setScanning(false);
-                console.log(data);
-                fetchBookInfo(data);
-              }
-            }}
+            onBarcodeScanned={({ data }) => handleBarcodeScanned(data)}
           >
             <View style={styles.overlay}>
               <View style={[styles.corner, styles.topLeft]} />
@@ -165,7 +174,8 @@ export default function BarcodeScan() {
               if (manualBarcode.trim()) {
                 handleManualInput();
               } else {
-                setBookInfo(null);
+                setBarcode("");
+                setManualBarcode("");
                 setScanning(true);
                 setShowBookInfo(false);
                 if (manualInputRef.current) {
@@ -178,6 +188,12 @@ export default function BarcodeScan() {
               {manualBarcode ? "Enter" : "CANCEL"}
             </Text>
           </TouchableOpacity>
+
+          {errorVisible && (
+            <Text style={styles.errorText}>
+              This book could not be found in the system.
+            </Text>
+          )}
 
           {bookInfo && (
             <TouchableOpacity
@@ -371,5 +387,11 @@ const styles = StyleSheet.create({
     height: 2,
     backgroundColor: "gray",
     alignSelf: "center",
+  },
+  errorText: {
+    color: "red",
+    fontSize: width * 0.04,
+    textAlign: "center",
+    marginTop: height * 0.02,
   },
 });
