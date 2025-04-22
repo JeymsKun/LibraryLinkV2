@@ -54,6 +54,10 @@ export default function BarcodeScan() {
     },
   });
 
+  useEffect(() => {
+    console.log("Current barcode:", barcode);
+  }, [barcode]);
+
   const handleRefresh = async () => {
     setRefreshing(true);
 

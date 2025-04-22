@@ -7,8 +7,8 @@ export const fetchBookInfo = async (barcode) => {
 
   const { data, error } = await supabase
     .from("books")
-    .select("*")
-    .eq("barcode_code", barcode)
+    .select("*, genres:genre_id(name)")
+    .eq("barcode", barcode)
     .single();
 
   if (error) {
@@ -32,6 +32,7 @@ export const fetchBookInfo = async (barcode) => {
 
   return {
     ...data,
+    genre: data.genres?.name || "Unknown Genre",
     coverUrl,
     imageUrls,
   };
