@@ -9,41 +9,42 @@
     "web": "expo start --web"
   },
   "dependencies": {
-    "@react-native-community/datetimepicker": "^8.2.0",
+    "@react-native-community/datetimepicker": "8.3.0",
     "@react-native-picker/picker": "^2.11.0",
-    "@react-navigation/native": "^7.0.19",
-    "@react-navigation/native-stack": "^7.3.3",
+    "@react-navigation/drawer": "^7.3.9",
+    "@react-navigation/native": "^7.0.14",
+    "@react-navigation/native-stack": "^7.2.0",
     "@reduxjs/toolkit": "^2.7.0",
     "@supabase/supabase-js": "^2.49.4",
     "@tanstack/react-query": "^5.74.4",
     "base64-arraybuffer": "^1.0.2",
-    "expo": "~52.0.42",
-    "expo-camera": "~16.0.18",
-    "expo-clipboard": "~7.0.1",
-    "expo-constants": "~17.0.8",
-    "expo-dev-client": "~5.0.19",
-    "expo-file-system": "~18.0.12",
-    "expo-image-picker": "^16.0.6",
-    "expo-linear-gradient": "~14.0.2",
-    "expo-linking": "~7.0.5",
-    "expo-media-library": "~17.0.6",
-    "expo-router": "^4.0.20",
-    "expo-secure-store": "~14.0.1",
-    "expo-sharing": "~13.0.1",
-    "expo-status-bar": "~2.0.1",
+    "expo": "^53.0.8",
+    "expo-camera": "~16.1.6",
+    "expo-clipboard": "~7.1.4",
+    "expo-constants": "~17.1.6",
+    "expo-dev-client": "~5.1.8",
+    "expo-file-system": "~18.1.9",
+    "expo-image-picker": "~16.1.4",
+    "expo-linear-gradient": "~14.1.4",
+    "expo-linking": "~7.1.4",
+    "expo-media-library": "~17.1.6",
+    "expo-router": "~5.0.6",
+    "expo-secure-store": "~14.2.3",
+    "expo-sharing": "~13.1.5",
+    "expo-status-bar": "~2.2.3",
     "moti": "^0.30.0",
-    "react": "18.3.1",
-    "react-native": "0.76.8",
+    "react": "19.0.0",
+    "react-native": "0.79.2",
     "react-native-chart-kit": "^6.12.0",
-    "react-native-gesture-handler": "~2.20.2",
+    "react-native-gesture-handler": "~2.24.0",
     "react-native-get-random-values": "^1.11.0",
     "react-native-paper": "^5.13.3",
     "react-native-picker-select": "^9.3.1",
-    "react-native-reanimated": "~3.16.1",
+    "react-native-reanimated": "~3.17.4",
     "react-native-reanimated-carousel": "^4.0.2",
-    "react-native-safe-area-context": "4.12.0",
-    "react-native-screens": "~4.4.0",
-    "react-native-svg": "15.8.0",
+    "react-native-safe-area-context": "5.4.0",
+    "react-native-screens": "~4.10.0",
+    "react-native-svg": "15.11.2",
     "react-native-vector-icons": "^10.2.0",
     "react-redux": "^9.2.0",
     "uuid": "^11.1.0"
@@ -52,5 +53,19 @@
     "@babel/core": "^7.20.0",
     "@react-native-community/cli": "^18.0.0"
   },
-  "private": true
+  "private": true,
+  "expo": {
+    "doctor": {
+      "reactNativeDirectoryCheck": {
+        "exclude": [
+          "react-native-chart-kit",
+          "react-native-vector-icons",
+          "base64-arraybuffer",
+          "react-native-vector-icons",
+          "uuid"
+        ],
+        "listUnknownPackages": false
+      }
+    }
+  }
 }

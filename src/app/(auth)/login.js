@@ -14,10 +14,6 @@ import { Ionicons } from "@expo/vector-icons";
 export default function LoginOptionsPage() {
   const router = useRouter();
 
-  const navigateToStaffLogin = () => {
-    router.push("/library-staff/login");
-  };
-
   const navigateToUserLogin = () => {
     router.push("/library-user/login");
   };
@@ -44,16 +40,7 @@ export default function LoginOptionsPage() {
       </View>
 
       <View style={styles.optionsContainer}>
-        <Text style={styles.loginAsText}>LOGIN AS</Text>
-
-        <TouchableOpacity
-          style={styles.optionButtonStaff}
-          onPress={navigateToStaffLogin}
-        >
-          <Ionicons name="people-circle" size={26} color="#fff" />
-          <Text style={styles.optionButtonText}>Library Staff</Text>
-          <Ionicons name="chevron-forward" size={24} color="#fff" />
-        </TouchableOpacity>
+        <Text style={styles.loginAsText}>LOGIN</Text>
 
         <TouchableOpacity
           style={styles.optionButtonUser}
@@ -66,7 +53,7 @@ export default function LoginOptionsPage() {
       </View>
 
       <View style={styles.signupContainer}>
-        <Text style={styles.signupText}>No account for user?</Text>
+        <Text style={styles.signupText}>No account?</Text>
         <TouchableOpacity onPress={navigateToSignup}>
           <Text style={styles.signupLinkText}>Sign up here</Text>
         </TouchableOpacity>
@@ -81,23 +68,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "white",
   },
-  headerContainer: {
-    marginTop: 60,
-    marginBottom: 20,
-    paddingHorizontal: 24,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#3b82f6",
-    textAlign: "center",
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: "#777",
-    textAlign: "center",
-    marginTop: 8,
-  },
   logoContainer: {
     alignItems: "center",
     marginVertical: 40,
@@ -111,27 +81,9 @@ const styles = StyleSheet.create({
     width: 150,
     height: 150,
   },
-
   optionsContainer: {
     paddingHorizontal: 24,
     marginTop: 20,
-  },
-  optionButtonStaff: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#FAD24E",
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: "#FAD24E",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
   optionButtonUser: {
     flexDirection: "row",

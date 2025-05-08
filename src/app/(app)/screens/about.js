@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Image,
   ActivityIndicator,
+  ScrollView,
 } from "react-native";
 import Carousel from "react-native-reanimated-carousel";
 import { useLocalSearchParams } from "expo-router";
@@ -58,6 +59,8 @@ export default function AboutBook() {
       ].filter(Boolean)
     : [];
 
+  const barcodeImageUrl = book ? makePublicUrl(book.barcode_url) : null;
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -103,8 +106,30 @@ export default function AboutBook() {
         ))}
       </View>
 
-      <Text style={styles.bookTitle}>{book.title}</Text>
-      <Text style={styles.bookDescription}>{book.description}</Text>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.bookTitle}>{book.title}</Text>
+        <Text style={styles.bookInfo}>Author: {book.author}</Text>
+        <Text style={styles.bookInfo}>Publisher: {book.publisher}</Text>
+        <Text style={styles.bookInfo}>
+          Published Date: {book.published_date}
+        </Text>
+        <Text style={styles.bookInfo}>Total Copies: {book.total_copies}</Text>
+        <Text style={styles.bookDescription}>{book.description}</Text>
+        {barcodeImageUrl && (
+          <View style={styles.barcodeContainer}>
+            <Text style={styles.barcodeLabel}>Barcode Image:</Text>
+            <Image
+              source={barcodeImageUrl}
+              style={styles.barcodeImage}
+              resizeMode="contain"
+            />
+          </View>
+        )}
+        <View style={{ height: 80 }} />
+      </ScrollView>
 
       <TouchableOpacity
         style={styles.bookingButton}
@@ -160,12 +185,22 @@ const styles = StyleSheet.create({
   activeDot: {
     backgroundColor: "#3b82f6",
   },
+  scrollContent: {
+    paddingBottom: 100,
+    alignItems: "center",
+  },
   bookTitle: {
     fontSize: width * 0.05,
     fontWeight: "bold",
     color: "#000",
     textAlign: "center",
     marginTop: height * 0.02,
+  },
+  bookInfo: {
+    fontSize: width * 0.04,
+    color: "#333",
+    marginVertical: height * 0.005,
+    textAlign: "center",
   },
   bookDescription: {
     fontSize: width * 0.04,
@@ -176,7 +211,7 @@ const styles = StyleSheet.create({
   },
   bookingButton: {
     position: "absolute",
-    bottom: height * 0.05,
+    bottom: height * 0.03,
     backgroundColor: "#F8B919",
     borderRadius: 15,
     paddingVertical: height * 0.015,
@@ -187,5 +222,20 @@ const styles = StyleSheet.create({
     fontSize: width * 0.045,
     fontWeight: "bold",
     color: "#000",
+  },
+  barcodeContainer: {
+    marginTop: height * 0.02,
+    alignItems: "center",
+  },
+  barcodeLabel: {
+    fontSize: width * 0.04,
+    color: "#333",
+    textAlign: "center",
+    marginBottom: 5,
+  },
+  barcodeImage: {
+    width: width * 0.6,
+    height: width * 0.2,
+    borderRadius: 12,
   },
 });
