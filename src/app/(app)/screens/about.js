@@ -79,101 +79,128 @@ export default function AboutBook() {
   }
 
   return (
-    <View style={styles.container}>
-      <Carousel
-        width={width}
-        height={height * 0.45}
-        data={images}
-        scrollAnimationDuration={500}
-        onSnapToItem={(index) => setCurrentIndex(index)}
-        renderItem={({ item }) => (
-          <View style={styles.bookContainer}>
-            <Image
-              source={{ uri: item }}
-              style={{ width: "100%", height: "100%", borderRadius: 12 }}
-              resizeMode="cover"
-            />
-          </View>
-        )}
-      />
-
-      <View style={styles.pagination}>
-        {images.map((_, index) => (
-          <View
-            key={index}
-            style={[styles.dot, currentIndex === index && styles.activeDot]}
+    <ScrollView
+      contentContainerStyle={styles.scrollContainer}
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={styles.container}>
+        <View style={styles.carouselContainer}>
+          <Carousel
+            width={width * 0.6}
+            height={width * 0.6 * 1.5}
+            data={images}
+            scrollAnimationDuration={500}
+            onSnapToItem={(index) => setCurrentIndex(index)}
+            renderItem={({ item }) => (
+              <View style={styles.bookContainer}>
+                <Image
+                  source={{ uri: item }}
+                  style={{ width: "100%", height: "100%", borderRadius: 12 }}
+                  resizeMode="cover"
+                />
+              </View>
+            )}
           />
-        ))}
-      </View>
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <Text style={styles.bookTitle}>{book.title}</Text>
-        <Text style={styles.bookInfo}>Author: {book.author}</Text>
-        <Text style={styles.bookInfo}>Publisher: {book.publisher}</Text>
-        <Text style={styles.bookInfo}>
-          Published Date: {book.published_date}
-        </Text>
-        <Text style={styles.bookInfo}>Total Copies: {book.total_copies}</Text>
-        <Text style={styles.bookDescription}>{book.description}</Text>
-        {barcodeImageUrl && (
-          <View style={styles.barcodeContainer}>
-            <Text style={styles.barcodeLabel}>Barcode Image:</Text>
-            <Image
-              source={barcodeImageUrl}
-              style={styles.barcodeImage}
-              resizeMode="contain"
-            />
+          <View style={styles.pagination}>
+            {images.map((_, index) => (
+              <View
+                key={index}
+                style={[styles.dot, currentIndex === index && styles.activeDot]}
+              />
+            ))}
           </View>
-        )}
-        <View style={{ height: 80 }} />
-      </ScrollView>
+        </View>
 
-      <TouchableOpacity
-        style={styles.bookingButton}
-        onPress={() => addBooking(book)}
-      >
-        <Text style={styles.bookingButtonText}>Add to Booking Cart</Text>
-      </TouchableOpacity>
-    </View>
+        <View style={styles.mainDetailsContainer}>
+          <Text style={styles.bookTitle}>{book.title}</Text>
+          <View style={styles.divider} />
+
+          <Text style={styles.bookInfo}>
+            <Text style={styles.boldLabel}>Author: </Text>
+            {book.author}
+          </Text>
+
+          <Text style={styles.bookInfo}>
+            <Text style={styles.boldLabel}>Publisher: </Text>
+            {book.publisher}
+          </Text>
+
+          <Text style={styles.bookInfo}>
+            <Text style={styles.boldLabel}>Published Date: </Text>
+            {new Date(book.published_date).toLocaleDateString("en-US", {
+              weekday: "short",
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+            })}
+          </Text>
+
+          <Text style={styles.bookInfo}>
+            <Text style={styles.boldLabel}>Total Copies: </Text>
+            {book.copies}
+          </Text>
+
+          <Text style={styles.bookDescription}>{book.description}</Text>
+
+          {barcodeImageUrl && (
+            <View style={styles.barcodeContainer}>
+              <Text style={styles.barcodeLabel}>Barcode:</Text>
+              <Image
+                source={{ uri: barcodeImageUrl }}
+                style={styles.barcodeImage}
+                resizeMode="contain"
+              />
+            </View>
+          )}
+        </View>
+
+        <TouchableOpacity
+          style={styles.bookingButton}
+          onPress={() => addBooking(book)}
+        >
+          <Text style={styles.bookingButtonText}>Add to Booking Cart</Text>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  scrollContainer: {
+    paddingBottom: 40,
+    backgroundColor: "#fff",
+  },
   container: {
     flex: 1,
-    backgroundColor: "#A9DEFF",
-    paddingTop: height * 0.05,
     alignItems: "center",
+    padding: 16,
+    backgroundColor: "#fff",
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#A9DEFF",
+    padding: 20,
+    backgroundColor: "#fff",
+  },
+  carouselContainer: {
+    width: width * 0.6,
+    aspectRatio: 2 / 3,
+    alignSelf: "center",
+    marginBottom: 30,
   },
   bookContainer: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    width: width * 0.7,
-    height: height * 0.4,
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-    alignSelf: "center",
+    width: "100%",
+    height: "100%",
+    borderRadius: 8,
     overflow: "hidden",
+    backgroundColor: "#f5f5f5",
   },
   pagination: {
     flexDirection: "row",
     justifyContent: "center",
-    alignItems: "center",
-    marginTop: 10,
+    marginTop: 8,
   },
   dot: {
     width: 8,
@@ -183,59 +210,62 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
   },
   activeDot: {
-    backgroundColor: "#3b82f6",
+    backgroundColor: "#000",
   },
-  scrollContent: {
-    paddingBottom: 100,
-    alignItems: "center",
+  mainDetailsContainer: {
+    width: "100%",
+    paddingHorizontal: 10,
+    marginBottom: 24,
   },
   bookTitle: {
-    fontSize: width * 0.05,
+    fontSize: 24,
     fontWeight: "bold",
-    color: "#000",
+    marginBottom: 8,
     textAlign: "center",
-    marginTop: height * 0.02,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "#ccc",
+    marginVertical: 12,
+    width: "100%",
   },
   bookInfo: {
-    fontSize: width * 0.04,
+    fontSize: 16,
     color: "#333",
-    marginVertical: height * 0.005,
-    textAlign: "center",
+    marginBottom: 4,
+  },
+  boldLabel: {
+    fontWeight: "bold",
   },
   bookDescription: {
-    fontSize: width * 0.04,
-    color: "#333",
-    margin: height * 0.01,
-    paddingHorizontal: width * 0.1,
-    textAlign: "center",
-  },
-  bookingButton: {
-    position: "absolute",
-    bottom: height * 0.03,
-    backgroundColor: "#F8B919",
-    borderRadius: 15,
-    paddingVertical: height * 0.015,
-    paddingHorizontal: width * 0.1,
-    alignItems: "center",
-  },
-  bookingButtonText: {
-    fontSize: width * 0.045,
-    fontWeight: "bold",
-    color: "#000",
+    fontSize: 16,
+    color: "#444",
+    marginTop: 12,
+    lineHeight: 22,
   },
   barcodeContainer: {
-    marginTop: height * 0.02,
+    margin: 10,
     alignItems: "center",
   },
   barcodeLabel: {
-    fontSize: width * 0.04,
-    color: "#333",
-    textAlign: "center",
-    marginBottom: 5,
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 8,
   },
   barcodeImage: {
-    width: width * 0.6,
-    height: width * 0.2,
-    borderRadius: 12,
+    width: 200,
+    height: 80,
+  },
+  bookingButton: {
+    backgroundColor: "#3498db",
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    borderRadius: 8,
+    marginTop: 20,
+  },
+  bookingButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });

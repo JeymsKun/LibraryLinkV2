@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import {
   View,
   Text,
@@ -10,9 +10,11 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { useAuth } from "../../context/AuthContext";
 
 export default function LoginOptionsPage() {
   const router = useRouter();
+  const { isAuthenticated } = useAuth();
 
   const navigateToUserLogin = () => {
     router.push("/library-user/login");
@@ -21,6 +23,14 @@ export default function LoginOptionsPage() {
   const navigateToSignup = () => {
     router.push("/signup");
   };
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.replace("/use/index");
+    } else {
+      router.push("/library-user/login");
+    }
+  }, [isAuthenticated]);
 
   return (
     <SafeAreaView style={styles.container}>

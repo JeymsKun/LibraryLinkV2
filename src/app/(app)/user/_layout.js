@@ -11,11 +11,31 @@ import {
   Pressable,
   Animated,
 } from "react-native";
+import { useViewToggle } from "../../../context/ViewToggleContext";
 
 export default function UserLayout() {
+  const { showPending, toggleView } = useViewToggle();
   const [time, setTime] = useState("");
   const [menuVisible, setMenuVisible] = useState(false);
   const slideAnim = useState(new Animated.Value(300))[0];
+  const [pressed, setPressed] = useState(null);
+  const [showFavorites, setShowFavorites] = useState(false);
+  const [showRecent, setShowRecent] = useState(false);
+  const [scale, setScale] = useState(new Animated.Value(1));
+
+  const handlePressIn = () => {
+    Animated.spring(scale, {
+      toValue: 1.1,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+    }).start();
+  };
 
   useEffect(() => {
     const updateTime = () => {
@@ -49,6 +69,19 @@ export default function UserLayout() {
         duration: 300,
         useNativeDriver: true,
       }).start();
+    }
+  };
+
+  const handlePress = (item) => {
+    setPressed(item);
+    if (item === "favorite") {
+      setShowFavorites(!showFavorites);
+      setShowRecent(false);
+    } else if (item === "recent") {
+      setShowRecent(!showRecent);
+      setShowFavorites(false);
+    } else if (item === "view") {
+      toggleView();
     }
   };
 
@@ -196,7 +229,6 @@ export default function UserLayout() {
         />
       </Tabs>
 
-      {/* Bottom Sheet Menu */}
       {menuVisible && (
         <Animated.View
           style={[
@@ -205,19 +237,35 @@ export default function UserLayout() {
           ]}
         >
           <Pressable
-            style={styles.menuItem}
-            onPress={() => console.log("My Returned clicked")}
+            style={[
+              styles.menuItem,
+              pressed === "view" && styles.pressedMenuItem,
+            ]}
+            onPressIn={handlePressIn}
+            onPressOut={handlePressOut}
+            onPress={() => handlePress("view")}
           >
-            <Ionicons name="arrow-undo" size={20} color="#3b82f6" />
-            <Text style={styles.menuText}>My Returned</Text>
+            <Ionicons
+              name={showPending ? "hourglass" : "eye"}
+              size={20}
+              color="#3b82f6"
+            />
+            <Text style={styles.menuText}>
+              {showPending ? "My Recently Viewed" : "My Pending"}
+            </Text>
           </Pressable>
+
           <Pressable
-            style={styles.menuItem}
-            onPress={() => console.log("My Favorite clicked")}
+            style={[
+              styles.menuItem,
+              pressed === "favorite" && styles.pressedMenuItem,
+            ]}
+            onPress={() => handlePress("favorite")}
           >
             <Ionicons name="heart" size={20} color="#3b82f6" />
             <Text style={styles.menuText}>My Favorite</Text>
           </Pressable>
+
           <Pressable style={styles.menuItem} onPress={toggleMenu}>
             <Ionicons name="close" size={20} color="#f87171" />
             <Text style={[styles.menuText, { color: "#f87171" }]}>Close</Text>
@@ -250,6 +298,10 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     borderBottomWidth: 1,
     borderBottomColor: "#f3f4f6",
+  },
+  pressedMenuItem: {
+    backgroundColor: "#e5e7eb",
+    borderRadius: 8,
   },
   menuText: {
     fontSize: 16,

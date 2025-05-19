@@ -13,6 +13,7 @@ import { useRouter } from "expo-router";
 import { supabase } from "../../../lib/supabase";
 import { useFocusEffect } from "@react-navigation/native";
 import { useAuth } from "../../../context/AuthContext";
+import { useViewToggle } from "../../../context/ViewToggleContext";
 
 const fetchUserRecord = async (userId) => {
   try {
@@ -45,6 +46,40 @@ export default function UserDashboard() {
   const [recentBooks, setRecentBooks] = useState([]);
   const [userRecord, setUserRecord] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [pendingBooks, setPendingBooks] = useState([]);
+  const { showPending, toggleView } = useViewToggle();
+
+  const fetchPendingBooks = async () => {
+    if (!userId) return;
+    try {
+      const { data, error } = await supabase
+        .from("booking_requests")
+        .select("*, books(*)")
+        .eq("user_id", userId)
+        .eq("status", "waiting");
+
+      if (error) {
+        console.error("Error fetching pending books:", error);
+        return;
+      }
+
+      const resolved = await Promise.all(
+        data.map(async ({ books }) => {
+          const { data: urlData } = supabase.storage
+            .from("library")
+            .getPublicUrl(books.cover_image_url.trim());
+          return {
+            ...books,
+            coverUrl: urlData.publicUrl,
+          };
+        })
+      );
+
+      setPendingBooks(resolved);
+    } catch (err) {
+      console.error("Error fetching pending books:", err);
+    }
+  };
 
   const fetchRecentViewedBooks = async () => {
     console.log("Fetching recent viewed books for userId:", userId);
@@ -102,6 +137,7 @@ export default function UserDashboard() {
   useFocusEffect(
     useCallback(() => {
       fetchRecentViewedBooks();
+      fetchPendingBooks();
     }, [userId])
   );
 
@@ -123,9 +159,20 @@ export default function UserDashboard() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        <Text style={styles.sectionTitle}>Recently Viewed</Text>
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            margin: 10,
+          }}
+        >
+          <Text style={styles.sectionTitle}>
+            {showPending ? "My Pending" : "Recently Viewed"}
+          </Text>
+        </View>
+
         <View style={styles.bookGrid}>
-          {recentBooks.map((book) => (
+          {(showPending ? pendingBooks : recentBooks).map((book) => (
             <TouchableOpacity
               key={book.books_id}
               style={styles.bookContainer}

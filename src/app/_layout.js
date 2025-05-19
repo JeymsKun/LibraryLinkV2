@@ -7,6 +7,7 @@ import { BookingProvider } from "../context/BookingContext";
 import { Provider } from "react-redux";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { store } from "../redux/store";
+import { ViewToggleProvider } from "../context/ViewToggleContext";
 
 const queryClient = new QueryClient();
 
@@ -17,29 +18,31 @@ export default function RootLayout() {
         <AuthProvider>
           <SupabaseProvider>
             <BookingProvider>
-              <StatusBar style="auto" />
-              <Stack
-                screenOptions={{
-                  headerShown: false,
-                  contentStyle: { backgroundColor: "#f5f5f5" },
-                  animation: "slide_from_right",
-                }}
-              >
-                <Stack.Screen name="index" />
-                <Stack.Screen
-                  name="(auth)"
-                  options={{
+              <ViewToggleProvider>
+                <StatusBar style="auto" />
+                <Stack
+                  screenOptions={{
                     headerShown: false,
+                    contentStyle: { backgroundColor: "#f5f5f5" },
+                    animation: "slide_from_right",
                   }}
-                />
-                <Stack.Screen
-                  name="(app)"
-                  options={{
-                    headerShown: false,
-                    gestureEnabled: false,
-                  }}
-                />
-              </Stack>
+                >
+                  <Stack.Screen name="index" />
+                  <Stack.Screen
+                    name="(auth)"
+                    options={{
+                      headerShown: false,
+                    }}
+                  />
+                  <Stack.Screen
+                    name="(app)"
+                    options={{
+                      headerShown: false,
+                      gestureEnabled: false,
+                    }}
+                  />
+                </Stack>
+              </ViewToggleProvider>
             </BookingProvider>
           </SupabaseProvider>
         </AuthProvider>

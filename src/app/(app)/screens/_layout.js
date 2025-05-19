@@ -1,8 +1,10 @@
-import React from "react";
+import React, { useState } from "react";
 import { Stack } from "expo-router";
-import { TouchableOpacity, Image, View } from "react-native";
+import { TouchableOpacity, Image, View, Text } from "react-native";
 
 export default function UserLayout() {
+  const [liked, setLiked] = useState(false);
+
   return (
     <Stack
       screenOptions={{
@@ -18,21 +20,13 @@ export default function UserLayout() {
             <View
               style={{ flexDirection: "row", alignItems: "center", gap: 20 }}
             >
-              <TouchableOpacity
-                onPress={() => {
-                  console.log("Icon pressed!");
-                }}
-              >
-                <Image
-                  source={require("../../../assets/heart.png")}
-                  style={{ width: 25, height: 25 }}
-                  resizeMode="contain"
-                />
+              <TouchableOpacity onPress={() => setLiked((prev) => !prev)}>
+                <Text style={{ fontSize: 24 }}>{liked ? "❤️" : "🤍"}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 onPress={() => {
-                  console.log("Icon pressed!");
+                  console.log("Cart icon pressed!");
                 }}
               >
                 <Image
